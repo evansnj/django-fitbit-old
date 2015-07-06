@@ -1,14 +1,17 @@
-from django.conf import settings
 from django.db import models
+from django.conf import settings
 from django.utils.encoding import python_2_unicode_compatible
 
 
-UserModel = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
-UserFitbitUserModel = getattr(settings, 'USERFITBIT_USER_MODEL', UserModel)
+UserFitbitUserModel = getattr(settings, 'USERFITBIT_USER_MODEL', 'auth.User')
 
 
 @python_2_unicode_compatible
 class UserFitbit(models.Model):
+    """
+    This model stores a user's Fitbit authentication.
+    """
+
     user = models.OneToOneField(UserFitbitUserModel)
     fitbit_user = models.CharField(max_length=32, unique=True)
     auth_token = models.TextField()
@@ -44,6 +47,7 @@ class TimeSeriesDataType(models.Model):
     )
     category = models.IntegerField(choices=CATEGORY_CHOICES)
     resource = models.CharField(max_length=128)
+    intraday_support = models.BooleanField(default=False)
 
     def __str__(self):
         return self.path()
@@ -60,15 +64,20 @@ class TimeSeriesData(models.Model):
     """
     The purpose of this model is to store Fitbit user data obtained from their
     time series API (https://wiki.fitbit.com/display/API/API-Get-Time-Series).
+
+    A Fitbit user's timezone is retrieved, and used to convert data to UTC
+    prior to saving.
     """
 
-    user = models.ForeignKey(UserModel)
+    user = models.ForeignKey(UserFitbitUserModel)
     resource_type = models.ForeignKey(TimeSeriesDataType)
-    date = models.DateField()
+    date = models.DateTimeField()
     value = models.CharField(null=True, default=None, max_length=32)
+    intraday = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ('user', 'resource_type', 'date')
+        unique_together = ('user', 'resource_type', 'date', 'intraday')
+        get_latest_by = 'date'
 
     def string_date(self):
         return self.date.strftime('%Y-%m-%d')
